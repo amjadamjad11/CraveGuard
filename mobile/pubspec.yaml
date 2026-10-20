@@ -1,0 +1,53 @@
+name: craveguard
+description: "CraveGuard - AI-Powered Smoking Cessation App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+  
+  # Navigation
+  go_router: ^14.8.1
+  
+  # Networking
+  dio: ^5.7.0
+  
+  # Storage
+  flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.3.5
+  
+  # UI Components
+  fl_chart: ^0.70.2
+  shimmer: ^3.0.0
+  cached_network_image: ^3.4.1
+  flutter_animate: ^4.5.2
+  smooth_page_indicator: ^1.2.0+3
+  
+  # Utils
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  equatable: ^2.0.7
+  json_annotation: ^4.9.0
+  # Media
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/

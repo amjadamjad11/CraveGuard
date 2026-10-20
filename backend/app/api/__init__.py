@@ -1,0 +1,9 @@
+from app.api.auth import router as auth_router  # noqa
+from app.api.profile import router as profile_router  # noqa
+from app.api.smoking import router as smoking_router  # noqa
+from app.api.location import router as location_router  # noqa
+from app.api.intervention import router as intervention_router  # noqa
+from app.api.motivation import router as motivation_router  # noqa
+from app.api.progress import router as progress_router  # noqa
+from app.api.chat import router as chat_router  # noqa
+from app.api.notification import router as notification_router  # noqa
