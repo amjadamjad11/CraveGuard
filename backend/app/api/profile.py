@@ -1,5 +1,7 @@
+"""Profile API — user profile, survey responses, quit reasons, and onboarding completion."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+import json
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -18,7 +20,8 @@ async def get_profile(
     if not profile:
         return {}
     return {
-        "id": profile.id, "user_id": profile.user_id,
+        "id": profile.id,
+        "user_id": profile.user_id,
         "age_started_smoking": profile.age_started_smoking,
         "cigarettes_per_day": profile.cigarettes_per_day,
         "cigarettes_per_pack": profile.cigarettes_per_pack,
@@ -31,6 +34,7 @@ async def get_profile(
         "current_goal": profile.current_goal.value if profile.current_goal else None,
         "target_quit_date": profile.target_quit_date.isoformat() if profile.target_quit_date else None,
         "preferred_reminder_style": profile.preferred_reminder_style,
+        "onboarding_complete": profile.onboarding_complete,
     }
 
 
@@ -44,13 +48,32 @@ async def update_profile(
     return {"message": "Profile updated", "id": profile.id}
 
 
+@router.post("/complete-onboarding")
+async def complete_onboarding(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Complete the onboarding survey.
+
+    Saves all profile fields, creates the smoking baseline, saves triggers and
+    quit reasons, then marks the user's profile as onboarding_complete=True.
+
+    After this the client should:
+    1. Discard the registration token.
+    2. Navigate to the login screen.
+    3. Ask the user to sign in with their registered email and password.
+    """
+    result = await profile_service.complete_onboarding(db, current_user.id, payload)
+    return result
+
+
 @router.post("/survey-responses")
 async def save_survey(
     data: dict,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    import json
     sr = await profile_service.save_survey_response(
         db, current_user.id, data["question_key"], json.dumps(data.get("response", ""))
     )
@@ -62,10 +85,15 @@ async def get_surveys(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    import json
     responses = await profile_service.get_survey_responses(db, current_user.id)
-    return [{"id": r.id, "question_key": r.question_key,
-             "response": json.loads(r.response_json) if r.response_json else None} for r in responses]
+    return [
+        {
+            "id": r.id,
+            "question_key": r.question_key,
+            "response": json.loads(r.response_json) if r.response_json else None,
+        }
+        for r in responses
+    ]
 
 
 @router.post("/quit-reasons")
@@ -75,8 +103,12 @@ async def add_quit_reason(
     db: AsyncSession = Depends(get_db),
 ):
     reason = await profile_service.add_quit_reason(db, current_user.id, data)
-    return {"id": reason.id, "reason_category": reason.reason_category,
-            "priority_rank": reason.priority_rank, "custom_text": reason.custom_text}
+    return {
+        "id": reason.id,
+        "reason_category": reason.reason_category,
+        "priority_rank": reason.priority_rank,
+        "custom_text": reason.custom_text,
+    }
 
 
 @router.get("/quit-reasons")
@@ -85,5 +117,12 @@ async def get_quit_reasons(
     db: AsyncSession = Depends(get_db),
 ):
     reasons = await profile_service.get_quit_reasons(db, current_user.id)
-    return [{"id": r.id, "reason_category": r.reason_category,
-             "priority_rank": r.priority_rank, "custom_text": r.custom_text} for r in reasons]
+    return [
+        {
+            "id": r.id,
+            "reason_category": r.reason_category,
+            "priority_rank": r.priority_rank,
+            "custom_text": r.custom_text,
+        }
+        for r in reasons
+    ]

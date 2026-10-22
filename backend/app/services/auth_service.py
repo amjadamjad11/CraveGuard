@@ -1,18 +1,25 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User, UserProfile
-from app.schemas.auth import UserCreate, Token
+from app.schemas.auth import UserCreate, Token, RegistrationResponse
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 
-async def create_user(db: AsyncSession, user_data: UserCreate) -> Token:
-    """Register a new user, create profile, and return JWT token."""
-    result = await db.execute(select(User).where(User.email == user_data.email))
+def _normalize_email(email: str) -> str:
+    """Normalize email to lowercase and strip whitespace."""
+    return email.strip().lower()
+
+
+async def create_user(db: AsyncSession, user_data: UserCreate) -> RegistrationResponse:
+    """Register a new user, create profile, and return JWT token + onboarding flag."""
+    normalized_email = _normalize_email(user_data.email)
+
+    result = await db.execute(select(User).where(User.email == normalized_email))
     if result.scalar_one_or_none():
         raise ValueError("Email already registered")
 
     user = User(
-        email=user_data.email,
+        email=normalized_email,
         hashed_password=get_password_hash(user_data.password),
         preferred_name=user_data.preferred_name or "Friend",
         age_confirmed=user_data.age_confirmed,
@@ -28,12 +35,18 @@ async def create_user(db: AsyncSession, user_data: UserCreate) -> Token:
     await db.refresh(user)
 
     token = create_access_token(data={"sub": str(user.id)})
-    return Token(access_token=token)
+    return RegistrationResponse(
+        access_token=token,
+        needs_onboarding=True,
+        user_id=user.id,
+        preferred_name=user.preferred_name,
+    )
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str):
     """Authenticate user and return JWT token or None."""
-    result = await db.execute(select(User).where(User.email == email))
+    normalized_email = _normalize_email(email)
+    result = await db.execute(select(User).where(User.email == normalized_email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.hashed_password):
         return None

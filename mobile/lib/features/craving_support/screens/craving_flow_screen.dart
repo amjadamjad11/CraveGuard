@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../theme/app_colors.dart';
 import '../../../services/demo_service.dart';
+import '../../../providers/app_providers.dart';
+import '../../../services/location_service.dart';
 
 class CravingFlowScreen extends ConsumerStatefulWidget {
   const CravingFlowScreen({super.key});
@@ -290,7 +292,18 @@ class _CravingFlowScreenState extends ConsumerState<CravingFlowScreen> with Tick
       ],
     ),
     nextLabel: 'Done',
-    onNext: () => Navigator.pop(context),
+    onNext: () async {
+      final loc = await LocationService().getCurrentPosition();
+      ref.read(smokingRepoProvider).logCravingEvent({
+        'intensity_before': _intensity.round(),
+        'trigger_category': _trigger,
+        'feeling': _feeling,
+        'intervention_helped': _helped,
+        'latitude': loc?.latitude,
+        'longitude': loc?.longitude,
+      });
+      if (mounted) Navigator.pop(context);
+    },
   );
 
   Widget _feedbackButton(String label, bool helpful, Color color) => GestureDetector(

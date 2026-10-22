@@ -1,7 +1,7 @@
 class AppConstants {
   static const String appName = 'CraveGuard';
-  static const String apiBaseUrl = 'http://10.0.2.2:8000/api/v1';
-  static const String apiBaseUrlDesktop = 'http://localhost:8000/api/v1';
+  static const String apiBaseUrl = 'http://10.0.2.2:8001/api/v1';
+  static const String apiBaseUrlDesktop = 'http://localhost:8001/api/v1';
   static const String tokenKey = 'auth_token';
   static const String onboardingCompleteKey = 'onboarding_complete';
   static const String demoModeKey = 'demo_mode';

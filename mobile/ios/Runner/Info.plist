@@ -47,6 +47,10 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CraveGuard uses your location to display smoking risk zones and help you avoid triggers.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>CraveGuard uses your location to deliver timely support when entering high-risk craving areas.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

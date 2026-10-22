@@ -45,6 +45,18 @@ class ApiService {
   Future<Response> post(String path, {dynamic data}) =>
       _dio.post(path, data: data);
 
+  /// POST with application/x-www-form-urlencoded content type.
+  /// Required for OAuth2PasswordRequestForm endpoints like /auth/login.
+  Future<Response> postForm(String path, Map<String, String> fields) {
+    return _dio.post(
+      path,
+      data: fields.entries.map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}').join('&'),
+      options: Options(
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      ),
+    );
+  }
+
   Future<Response> put(String path, {dynamic data}) =>
       _dio.put(path, data: data);
 

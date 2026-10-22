@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+*.sqlite3
+craveguard.db
+venv/
+.env
+.pytest_cache/

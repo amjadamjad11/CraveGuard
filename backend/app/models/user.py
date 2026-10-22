@@ -50,6 +50,7 @@ class UserProfile(Base):
     current_goal = Column(Enum(SmokingGoalType), default=SmokingGoalType.REDUCE)
     target_quit_date = Column(Date, nullable=True)
     preferred_reminder_style = Column(String(50), default="gentle")
+    onboarding_complete = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

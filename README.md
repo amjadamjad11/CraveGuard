@@ -8,7 +8,7 @@ CraveGuard helps people understand their smoking habits, recognize triggers, red
 
 - 🎯 **Personalized Onboarding** — Multi-step survey to understand habits, triggers, and goals
 - 📊 **Smoking & Craving Tracker** — Log episodes with mood, trigger, and intensity tracking
-- 🗺️ **Risk Map** — Identify and manage high-risk smoking locations with geofencing simulation
+- 🗺️ **Risk Map (Google Maps Platform + Geolocator)** — Real-world interactive street maps, current device location centering, explainable risk zone clusters, manual pin dropping, and geofence simulation with cooldown & quiet hours rules
 - 🤖 **CraveCoach AI** — Conversational AI assistant with adaptive keyword + LLM fallback coping strategies
 - 💰 **Savings Tracker** — Track money saved in ₹ and set personal financial goals
 - 📈 **Progress Dashboard** — Trend charts, milestone badges, and habit analytics
@@ -67,8 +67,25 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd mobile
 flutter pub get
+```
+
+#### Google Maps Configuration (Required for Live Street Tiles)
+1. Get a Google Maps API Key from the [Google Cloud Console](https://console.cloud.google.com/) with **Maps SDK for Android** and **Maps SDK for iOS** enabled.
+2. In `mobile/android/local.properties`, add your key:
+   ```properties
+   MAPS_API_KEY=AIzaSyYourActualGoogleMapsApiKeyHere
+   ```
+   *(A template is provided in `mobile/android/local.properties.example`)*
+3. For iOS, replace the placeholder in `mobile/ios/Runner/AppDelegate.swift` or inject via xcconfig.
+4. Run the app:
+```bash
 flutter run
 ```
+
+> **Note on Permissions**:
+> - Location permission is requested in the foreground with an explanation dialog only when the user opens the Risk Map or opts to attach GPS to a smoking/craving log.
+> - If denied, the user can still freely pan and zoom around the map or manually drop risk pins.
+> - Background geofencing is guarded by explicit user opt-in, cooldown intervals (60 mins), and quiet hours (10:00 PM – 7:00 AM).
 
 ### Demo Mode
 

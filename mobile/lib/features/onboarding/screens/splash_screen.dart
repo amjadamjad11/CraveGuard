@@ -58,13 +58,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     Timer(const Duration(milliseconds: 2500), _navigate);
   }
 
-  void _navigate() {
+  Future<void> _navigate() async {
     if (_navigated || !mounted) return;
+
+    // Wait until auth state resolves out of loading (max 5s).
+    // Guard every check with mounted so we don't use ref after disposal.
+    int waited = 0;
+    while (mounted &&
+        ref.read(authStateProvider) == AuthState.loading &&
+        waited < 50) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      waited++;
+    }
+
+    // Widget may have been disposed during the await — bail out safely.
+    if (!mounted) return;
     _navigated = true;
 
     final authState = ref.read(authStateProvider);
+    final onboardingInProgress = ref.read(onboardingInProgressProvider);
+
     if (authState == AuthState.authenticated) {
       context.go('/home');
+    } else if (onboardingInProgress) {
+      context.go('/onboarding');
     } else {
       context.go('/login');
     }

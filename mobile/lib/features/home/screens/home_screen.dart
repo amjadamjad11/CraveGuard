@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../theme/app_colors.dart';
 import '../../../providers/app_providers.dart';
 import '../../../services/demo_service.dart';
+import '../../../services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -12,22 +14,61 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _loadingReal = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
-  void _loadData() {
-    final demo = DemoService();
+  Future<void> _loadData() async {
     final isDemo = ref.read(demoModeProvider);
     if (isDemo) {
+      // Demo mode: populate providers with sample data
+      final demo = DemoService();
       ref.read(todaySmokingCountProvider.notifier).state = demo.todaySmokingCount;
       ref.read(weeklySmokingDataProvider.notifier).state = demo.weeklySmokingData;
       ref.read(savingsDataProvider.notifier).state = demo.savingsData;
       ref.read(topTriggersProvider.notifier).state = demo.topTriggers;
       ref.read(dailySummaryProvider.notifier).state = demo.dailySummary;
       ref.read(milestonesProvider.notifier).state = demo.milestones;
+      return;
+    }
+
+    // Real user: fetch from backend
+    if (_loadingReal) return;
+    setState(() => _loadingReal = true);
+    try {
+      final api = ref.read(apiServiceProvider);
+
+      // Daily summary
+      final dailyResp = await api.get('/progress/daily-summary');
+      if (dailyResp.statusCode == 200) {
+        final data = dailyResp.data as Map<String, dynamic>;
+        ref.read(dailySummaryProvider.notifier).state = data;
+        ref.read(todaySmokingCountProvider.notifier).state =
+            data['cigarettes_smoked'] as int? ?? 0;
+      }
+
+      // Savings
+      final savingsResp = await api.get('/progress/savings');
+      if (savingsResp.statusCode == 200) {
+        ref.read(savingsDataProvider.notifier).state =
+            Map<String, dynamic>.from(savingsResp.data as Map);
+      }
+
+      // Top triggers (from weekly summary)
+      final weeklyResp = await api.get('/progress/weekly-summary');
+      if (weeklyResp.statusCode == 200) {
+        ref.read(weeklySmokingDataProvider.notifier).state =
+            List<Map<String, dynamic>>.from(
+                (weeklyResp.data['days'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+    } catch (_) {
+      // Network unavailable — keep zeros (real user starts at zero)
+    } finally {
+      if (mounted) setState(() => _loadingReal = false);
     }
   }
 
@@ -60,7 +101,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(_greeting(), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondaryDark)),
-                            Text(isDemo ? 'Demo User' : 'Friend',
+                            Text(
+                              isDemo
+                                ? 'Demo User'
+                                : (ref.read(authStateProvider.notifier).userName ?? 'Friend'),
                               style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: AppColors.textPrimaryDark)),
                           ],
                         ),
@@ -109,9 +153,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _todayProgressCard(int todayCount, Map<String, dynamic> summary) {
-    final goal = 15; // baseline
-    final percentage = todayCount >= goal ? 1.0 : todayCount / goal;
-    final cravingsResisted = summary['cravings_resisted'] ?? 0;
+    final isDemo = ref.read(demoModeProvider);
+    // Use baseline from summary if available, else fall back to 15
+    final goal = (summary['baseline_cigs'] as int?) ??
+        (summary['cigarettes_per_day'] as int?) ?? 15;
+    final percentage = goal > 0
+        ? (todayCount / goal).clamp(0.0, 1.0)
+        : 0.0;
+    final cravingsResisted = summary['cravings_resisted'] as int? ?? 0;
+    final cravingsCount = summary['cravings_count'] as int? ?? 0;
+
+    // For real new users with no data yet, show an inviting empty state
+    final hasAnyData = isDemo || todayCount > 0 || cravingsCount > 0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -120,58 +173,115 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.navyLight.withValues(alpha: 0.5)),
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Progress ring
-              SizedBox(
-                width: 90, height: 90,
-                child: Stack(
-                  alignment: Alignment.center,
+      child: hasAnyData
+          ? Column(
+              children: [
+                Row(
                   children: [
+                    // Progress ring
                     SizedBox(
                       width: 90, height: 90,
-                      child: CircularProgressIndicator(
-                        value: 1.0 - percentage.clamp(0.0, 1.0),
-                        strokeWidth: 8,
-                        backgroundColor: AppColors.navyLight,
-                        color: percentage < 0.5 ? AppColors.mintGreen : percentage < 0.8 ? AppColors.amber : AppColors.coral,
-                        strokeCap: StrokeCap.round,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 90, height: 90,
+                            child: CircularProgressIndicator(
+                              // Ring fills as user smokes toward baseline — green = low, coral = at/above
+                              value: percentage,
+                              strokeWidth: 8,
+                              backgroundColor: AppColors.navyLight,
+                              color: percentage < 0.5
+                                  ? AppColors.mintGreen
+                                  : percentage < 0.8
+                                      ? AppColors.amber
+                                      : AppColors.coral,
+                              strokeCap: StrokeCap.round,
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('$todayCount',
+                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+                              Text('of $goal',
+                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('$todayCount', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                        Text('of $goal', style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
-                      ],
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Today's Progress",
+                            style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: 8),
+                          _miniStat(Icons.smoking_rooms, '$todayCount cigarettes', AppColors.coral),
+                          const SizedBox(height: 4),
+                          _miniStat(Icons.shield_outlined,
+                            '$cravingsResisted cravings resisted', AppColors.mintGreen),
+                          const SizedBox(height: 4),
+                          _miniStat(
+                            Icons.trending_down,
+                            todayCount < goal
+                                ? '${goal - todayCount} below baseline'
+                                : '${todayCount - goal} above baseline',
+                            todayCount <= goal ? AppColors.mintGreen : AppColors.coral,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Today's Progress", style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    _miniStat(Icons.smoking_rooms, '$todayCount cigarettes', AppColors.coral),
-                    const SizedBox(height: 4),
-                    _miniStat(Icons.shield_outlined, '$cravingsResisted cravings resisted', AppColors.mintGreen),
-                    const SizedBox(height: 4),
-                    _miniStat(Icons.trending_down, todayCount < goal
-                        ? '${goal - todayCount} below baseline'
-                        : '${todayCount - goal} above baseline',
-                        todayCount <= goal ? AppColors.mintGreen : AppColors.coral),
-                  ],
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.auto_awesome, color: AppColors.teal, size: 20),
+                  const SizedBox(width: 8),
+                  Text("Your Journey Starts Today",
+                    style: Theme.of(context).textTheme.titleMedium),
+                ]),
+                const SizedBox(height: 12),
+                Text(
+                  'Record your first smoking event or craving and CraveGuard will '
+                  'help you understand your patterns.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondaryDark, height: 1.5),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push('/craving-support'),
+                      icon: const Icon(Icons.flash_on_outlined, size: 16),
+                      label: const Text('Log Craving', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.mintGreen,
+                        side: const BorderSide(color: AppColors.mintGreen),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/patterns'),
+                      icon: const Icon(Icons.smoking_rooms, size: 16),
+                      label: const Text('Log Smoking', style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
     );
   }
 
@@ -318,14 +428,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   );
 
   void _showQuickLog() {
-    showModalBottomSheet(context: context, isScrollControlled: true, builder: (_) => _QuickLogSheet(
-      onLogged: () {
-        ref.read(todaySmokingCountProvider.notifier).state++;
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Smoking event recorded. No judgment — tracking helps.')));
-      },
-    ));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _QuickLogSheet(
+        onLogged: (trigger, mood, attachLocation) async {
+          Navigator.pop(context);
+          ref.read(todaySmokingCountProvider.notifier).state++;
+          Position? pos;
+          if (attachLocation) {
+            pos = await LocationService().getCurrentPosition();
+          }
+          await ref.read(smokingRepoProvider).logSmokingEvent({
+            'cigarettes_count': 1,
+            'mood': mood ?? 'Neutral',
+            'trigger_category': trigger ?? 'Habit',
+            'latitude': pos?.latitude,
+            'longitude': pos?.longitude,
+            'event_time': DateTime.now().toIso8601String(),
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(pos != null
+                    ? 'Smoking event recorded with location. Tracking helps map risk zones.'
+                    : 'Smoking event recorded. No judgment — tracking helps.'),
+              ),
+            );
+          }
+        },
+      ),
+    );
   }
 
   void _logResisted() {
@@ -342,7 +475,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class _QuickLogSheet extends StatefulWidget {
-  final VoidCallback onLogged;
+  final Function(String? trigger, String? mood, bool attachLocation) onLogged;
   const _QuickLogSheet({required this.onLogged});
   @override
   State<_QuickLogSheet> createState() => _QuickLogSheetState();
@@ -351,6 +484,7 @@ class _QuickLogSheet extends StatefulWidget {
 class _QuickLogSheetState extends State<_QuickLogSheet> {
   String? _trigger;
   String? _mood;
+  bool _attachLocation = true;
 
   @override
   Widget build(BuildContext context) {
@@ -389,10 +523,26 @@ class _QuickLogSheetState extends State<_QuickLogSheet> {
               selectedColor: AppColors.teal.withValues(alpha: 0.3),
             )).toList(),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Checkbox(
+                value: _attachLocation,
+                activeColor: AppColors.teal,
+                onChanged: (v) => setState(() => _attachLocation = v ?? true),
+              ),
+              const Expanded(
+                child: Text('📍 Associate approximate location with this log', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryDark)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(onPressed: widget.onLogged, child: const Text('Record')),
+            child: ElevatedButton(
+              onPressed: () => widget.onLogged(_trigger, _mood, _attachLocation),
+              child: const Text('Record'),
+            ),
           ),
           const SizedBox(height: 16),
         ],
