@@ -328,9 +328,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _savingsCard(Map<String, dynamic> savings) {
     final currency = savings['currency'] ?? '₹';
-    final daily = savings['daily_savings'] ?? 0;
-    final total = savings['total_savings'] ?? 0;
-    final avoided = savings['cigarettes_avoided'] ?? 0;
+    final avoided = (savings['cigarettes_avoided'] as num?)?.toInt() ?? 0;
+    final daily = avoided == 0 ? 0 : (savings['daily_savings'] ?? 0);
+    final total = avoided == 0 ? 0 : (savings['total_savings'] ?? 0);
 
     return GestureDetector(
       onTap: () => context.push('/savings'),

@@ -64,6 +64,18 @@ async def get_savings_data(db: AsyncSession, user_id: int) -> dict:
         .order_by(SmokingEvent.event_time.asc()).limit(1)
     )
     first_event_time = first_event.scalar_one_or_none()
+    if not first_event_time:
+        return {
+            'daily_savings': 0.0,
+            'weekly_savings': 0.0,
+            'monthly_savings': 0.0,
+            'total_savings': 0.0,
+            'yearly_projection': 0.0,
+            'cigarettes_avoided': 0,
+            'baseline_daily_cost': round(baseline_daily_cost, 2),
+            'current_daily_cost': 0.0,
+            'currency': profile.currency or 'INR',
+        }
     total_days = max(1, (date.today() - (first_event_time.date() if first_event_time else date.today())).days)
 
     result = await db.execute(
@@ -74,6 +86,20 @@ async def get_savings_data(db: AsyncSession, user_id: int) -> dict:
     total_baseline_cigs = baseline_cigs * total_days
     total_savings = max(0, (total_baseline_cigs - total_cigs) * price_per_cig)
     cigarettes_avoided = max(0, total_baseline_cigs - total_cigs)
+
+    # If no cigarettes were avoided, savings must be 0
+    if cigarettes_avoided == 0:
+        return {
+            "daily_savings": 0.0,
+            "weekly_savings": 0.0,
+            "monthly_savings": 0.0,
+            "total_savings": 0.0,
+            "yearly_projection": 0.0,
+            "cigarettes_avoided": 0,
+            "baseline_daily_cost": round(baseline_daily_cost, 2),
+            "current_daily_cost": round(today_cost, 2),
+            "currency": profile.currency or "INR",
+        }
 
     # Yearly projection based on current daily average
     daily_avg = total_cigs / total_days if total_days > 0 else baseline_cigs
@@ -192,3 +218,5 @@ async def get_milestones(db: AsyncSession, user_id: int) -> list:
         milestones.append({"title": "Quarter Century", "description": "Resist 25 cravings", "achieved": False, "icon": "medal"})
 
     return milestones
+
+

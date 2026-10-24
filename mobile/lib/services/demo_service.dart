@@ -1,12 +1,8 @@
-import 'dart:math';
-
 /// Provides all demo data when backend is unavailable.
 class DemoService {
   static final DemoService _instance = DemoService._();
   factory DemoService() => _instance;
   DemoService._();
-
-  final _rng = Random(42);
 
   Map<String, dynamic> get userProfile => {
     'preferred_name': 'Demo User',
@@ -21,52 +17,33 @@ class DemoService {
     'first_smoke_after_waking': '30_minutes',
   };
 
-  List<Map<String, dynamic>> get smokingEvents {
-    final events = <Map<String, dynamic>>[];
-    final now = DateTime.now();
-    for (int d = 0; d < 14; d++) {
-      final day = now.subtract(Duration(days: d));
-      final count = 10 + _rng.nextInt(8) - d ~/ 2;
-      for (int i = 0; i < count.clamp(3, 18); i++) {
-        events.add({
-          'id': d * 20 + i + 1,
-          'cigarettes_count': 1,
-          'event_time': DateTime(day.year, day.month, day.day,
-              6 + _rng.nextInt(16), _rng.nextInt(60)).toIso8601String(),
-          'mood': ['😐 Neutral', '😰 Stressed', '😟 Anxious', '🥱 Bored'][_rng.nextInt(4)],
-          'trigger_category': [
-            'Stress / Anxiety', 'Boredom', 'Habit / Routine',
-            'After Meals', 'With Tea / Coffee', 'Social Pressure',
-          ][_rng.nextInt(6)],
-          'craving_intensity': 3 + _rng.nextInt(7),
-        });
-      }
-    }
-    return events;
-  }
+  // New users start with no recorded smoking events.
+  // Events are added in real time as the user logs them via the app.
+  List<Map<String, dynamic>> get smokingEvents => [];
 
   List<Map<String, dynamic>> get weeklySmokingData {
+    // All days start at 0 for a fresh user.
     final data = <Map<String, dynamic>>[];
     final now = DateTime.now();
     for (int i = 6; i >= 0; i--) {
       final d = now.subtract(Duration(days: i));
       data.add({
         'date': '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
-        'count': (15 - i * 0.5 + _rng.nextInt(4) - 2).clamp(5, 18).toInt(),
+        'count': 0,
       });
     }
     return data;
   }
 
-  int get todaySmokingCount => 8;
+  int get todaySmokingCount => 0;
 
   List<Map<String, dynamic>> get cravingEvents => [
     {'id': 1, 'intensity_before': 8, 'intensity_after': 3, 'trigger_category': 'Stress / Anxiety',
      'feeling': '😰 Stressed', 'intervention_used': 'Breathing Exercise', 'intervention_helped': true,
-     'created_at': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String()},
+     'created_at': DateTime.now().subtract(const Duration(days: 1, hours: 2)).toIso8601String()},
     {'id': 2, 'intensity_before': 6, 'intensity_after': 4, 'trigger_category': 'Boredom',
      'feeling': '🥱 Bored', 'intervention_used': '5-Minute Walk', 'intervention_helped': true,
-     'created_at': DateTime.now().subtract(const Duration(hours: 5)).toIso8601String()},
+     'created_at': DateTime.now().subtract(const Duration(days: 1, hours: 5)).toIso8601String()},
     {'id': 3, 'intensity_before': 9, 'intensity_after': null, 'trigger_category': 'Social Pressure',
      'feeling': '😟 Anxious', 'intervention_used': null, 'intervention_helped': null,
      'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String()},
@@ -156,47 +133,42 @@ class DemoService {
   };
 
   Map<String, dynamic> get savingsData => {
-    'daily_savings': 93.75,
-    'weekly_savings': 656.25,
-    'monthly_savings': 2812.50,
-    'total_savings': 5625.00,
-    'yearly_projection': 34218.75,
-    'cigarettes_avoided': 225,
+    'daily_savings': 0.0,
+    'weekly_savings': 0.0,
+    'monthly_savings': 0.0,
+    'total_savings': 0.0,
+    'yearly_projection': 0.0,
+    'cigarettes_avoided': 0,
     'baseline_daily_cost': 187.50,
-    'current_daily_cost': 93.75,
+    'current_daily_cost': 0.0,
     'currency': 'INR',
   };
 
   List<Map<String, dynamic>> get savingsGoals => [
     {'id': 1, 'title': 'New Headphones', 'target_amount': 3000.0,
-     'current_amount': 1875.0, 'icon': 'headphones', 'is_completed': false},
+     'current_amount': 0.0, 'icon': 'headphones', 'is_completed': false},
     {'id': 2, 'title': 'Weekend Trip', 'target_amount': 10000.0,
-     'current_amount': 5625.0, 'icon': 'travel', 'is_completed': false},
+     'current_amount': 0.0, 'icon': 'travel', 'is_completed': false},
   ];
 
   List<Map<String, dynamic>> get milestones => [
-    {'title': 'First Step', 'description': 'Started tracking your smoking', 'achieved': true, 'icon': 'star'},
-    {'title': 'First Victory', 'description': 'Resisted your first craving', 'achieved': true, 'icon': 'trophy'},
-    {'title': 'Getting Stronger', 'description': 'Resisted 5 cravings', 'achieved': true, 'icon': 'muscle'},
+    {'title': 'First Step', 'description': 'Started tracking your smoking', 'achieved': false, 'icon': 'star'},
+    {'title': 'First Victory', 'description': 'Resisted your first craving', 'achieved': false, 'icon': 'trophy'},
+    {'title': 'Getting Stronger', 'description': 'Resisted 5 cravings', 'achieved': false, 'icon': 'muscle'},
     {'title': 'Double Digits', 'description': 'Resist 10 cravings', 'achieved': false, 'icon': 'fire'},
     {'title': 'Quarter Century', 'description': 'Resist 25 cravings', 'achieved': false, 'icon': 'medal'},
   ];
 
   Map<String, dynamic> get dailySummary => {
     'date': DateTime.now().toIso8601String().split('T')[0],
-    'cigarettes_smoked': 8,
-    'cravings_count': 3,
-    'cravings_resisted': 2,
-    'avg_craving_intensity': 6.5,
+    'cigarettes_smoked': 0,
+    'cravings_count': 0,
+    'cravings_resisted': 0,
+    'avg_craving_intensity': 0.0,
   };
 
-  List<Map<String, dynamic>> get topTriggers => [
-    {'trigger': 'Stress / Anxiety', 'count': 12},
-    {'trigger': 'Boredom', 'count': 8},
-    {'trigger': 'After Meals', 'count': 7},
-    {'trigger': 'Social Pressure', 'count': 5},
-    {'trigger': 'Habit / Routine', 'count': 4},
-  ];
+  // No historical triggers for a fresh user.
+  List<Map<String, dynamic>> get topTriggers => [];
 
   List<Map<String, dynamic>> get chatMessages => [
     {'id': 1, 'role': 'assistant', 'content':
@@ -235,3 +207,6 @@ class DemoService {
     return "I'm here to help! You can tell me:\n- 'I'm having a craving' for immediate support\n- 'I smoked' without judgment\n- 'How am I doing?' for progress\n- 'Help me plan' for tomorrow\n\nWhat would be most helpful right now? 💙\n\n_ℹ️ This is a pre-written response. Live AI is not currently configured._";
   }
 }
+
+
+

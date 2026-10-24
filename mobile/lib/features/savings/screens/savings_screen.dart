@@ -24,8 +24,14 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen> {
         ref.read(savingsDataProvider.notifier).state = DemoService().savingsData;
         ref.read(savingsGoalsProvider.notifier).state = DemoService().savingsGoals;
       }
-      // Simulated smoke-free start date: 12 days ago
-      final smokeFreeSince = DateTime.now().subtract(const Duration(days: 12, hours: 5, minutes: 33));
+      final events = ref.read(smokingEventsProvider);
+      DateTime smokeFreeSince;
+      if (events.isNotEmpty) {
+        final lastTimeStr = events.first['event_time'] as String?;
+        smokeFreeSince = lastTimeStr != null ? DateTime.tryParse(lastTimeStr) ?? DateTime.now() : DateTime.now();
+      } else {
+        smokeFreeSince = DateTime.now();
+      }
       _smokeFree = DateTime.now().difference(smokeFreeSince);
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) {
@@ -310,3 +316,4 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen> {
 
   String _fmt(dynamic v) => v != null ? (v as num).toStringAsFixed(0) : '0';
 }
+
